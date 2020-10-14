@@ -1374,10 +1374,24 @@ instdn1:   ldi     21                ; set position for next inst disassembly
            phi     rd
            sep     scall             ; set cursor position
            dw      gotoxy
+           ldi     '>'               ; marker for next instruction
+           sep     scall             ; display it
+           dw      f_type
            glo     r9                ; get P
            sep     ra                ; set into r7
            sep     rb                ; retrieve value into rf
            sep     scall             ; disassemble next instruction
+           dw      disassem
+           dec     rd                ; point to previous line
+           sep     scall             ; set cursor position
+           dw      gotoxy
+           ldi     ' '               ; move over 1 space
+           sep     scall             ; display it
+           dw      f_type
+           ldi     last.0            ; address of last instruction
+           plo     r7                ; set into register pointer
+           sep     rb                ; retrieve address
+           sep     scall             ; disassemble last instruction executed
            dw      disassem
 
 main:      ldi     23                ; position for prompt
@@ -1448,6 +1462,17 @@ main:      ldi     23                ; position for prompt
 cycle:     glo     r9                ; get P
            sep     ra                ; Set register pointer
            sep     rb                ; read register into rf
+           glo     r7                ; save pointer to R[P]
+           plo     re
+           ldi     last.0            ; location for last address
+           plo     r7                ; set register pointer
+           ghi     rf                ; get high byte of address
+           str     r7                ; and save it
+           inc     r7                ; point to low byte
+           glo     rf                ; low byte of address
+           str     r7                ; save it
+           glo     re                ; recover R[P] address
+           plo     r7
            lda     rf                ; get program byte
            plo     re                ; save it for now
            ghi     rf                ; write new value of R[P]
@@ -2478,7 +2503,8 @@ rf:        equ     re+2
 q:         equ     rf+2
 t:         equ     q+1
 ie:        equ     t+1
-multi:     equ     ie+1
+last:      equ     ie+1
+multi:     equ     last+2
 mcount:    equ     multi+1
 nbp:       equ     mcount+2
 bp:        equ     nbp+1
