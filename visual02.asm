@@ -1,4 +1,37 @@
+; *******************************************************************
+; *** This software is copyright 2020 by Michael H Riley          ***
+; *** You have permission to use, modify, copy, and distribute    ***
+; *** this software so long as this copyright notice is retained. ***
+; *** This software may not be used in commercial applications    ***
+; *** without express written permission from the author.         ***
+; *******************************************************************
+
+;[RLA] These are defined on the rcasm command line!
+;[RLA] #define ELFOS            ; build the version that runs under Elf/OS
+;[RLA] #define STGROM           ; build the STG EPROM version
+;[RLA] #define PICOROM          ; define for Mike's PIcoElf version
+
+;[RLA]   rcasm doesn't have any way to do a logical "OR" of assembly
+;[RLA] options, so define a master "ANYROM" option that's true for
+;[RLA] any of the ROM conditions...
+
+#ifdef PICOROM
+#define ANYROM
+#endif
+
+#ifdef STGROM
+#define ANYROM
+#endif
+
+#ifdef STGROM
+;[RLA] STG ROM addresses and options
+include config.inc
+#endif
+
 include    bios.inc
+#ifdef ELFOS
+include    kernel.inc
+#endif
 
 ; R7 - pointer to R[]
 ; R8.0 - D
@@ -9,7 +42,29 @@ include    bios.inc
 ; RA - Set R7 routine
 ; RB - Retrieve R[r7] into rf
 
+#ifdef PICOROM
+           org     0e000h
+edtasm:    equ     0b000h
+#else
+#ifdef STGROM
+           org     VISUAL
+;[RLA]  So, for the STGROM we don't actually need to define edtasm.  That's
+;[RLA] because the config.inc file defines EDTASM, and the current rcasm
+;[RLA] implementation is case INSENSITIVE for macro substitutions.  The code
+;[RLA] down below at asm: will just naturally do the right thing without any
+;[RLA] additional help.  If Mike ever changes rcasm to make #defines case
+;[RLA] sensitive, then you'll need this line.
+;[RLA]edtasm:      equ     EDTASM
+#else
+#ifdef ELFOS
+           org     0e000h
+#else
            org     8000h
+#endif
+#endif
+#endif
+
+
 start:     lbr     start2            ; jump past warm start
            lbr     begin             ; do not need initcall
 start2:    ldi     r0.1              ; get data segment
@@ -212,6 +267,8 @@ dodec:     sep     ra                ; set R7 to correct register
 dodis:     ghi     r9                ; get X
            sep     ra                ; set R7 to correct R register
            sep     rb                ; retrieve value into rf
+           ghi     r9                ; need to keep original X
+           plo     re
            ldn     rf                ; get value from memory
            ani     0fh               ; keep only low nybble
            plo     r9                ; put into P
@@ -225,7 +282,8 @@ dodis:     ghi     r9                ; get X
            plo     r7
            ldi     0                 ; need to disable
            str     r7
-           lbr     doirx             ; then increment x
+           glo     re                ; recover original X
+           lbr     doinc             ; then increment x
 
            db      0,'IDL ',0
 doidl:     lbr     instdn
@@ -606,6 +664,8 @@ doplo:     sep     ra                ; set R7 to correct R register
 doret:     ghi     r9                ; get X
            sep     ra                ; set R7 to correct R register
            sep     rb                ; retrieve value into rf
+           ghi     r9                ; save current X
+           plo     re
            ldn     rf                ; get value from memory
            ani     0fh               ; keep only low nybble
            plo     r9                ; put into P
@@ -619,7 +679,8 @@ doret:     ghi     r9                ; get X
            plo     r7
            ldi     1                 ; need to enable
            str     r7
-           lbr     doirx             ; then increment x
+           glo     re                ; recover original X
+           lbr     doinc             ; then increment x
 
            db      0,'REQ ',0
 doreq:     ldi     q.0               ; need address of Q
@@ -1281,6 +1342,8 @@ begin:     ldi     r0.1              ; Get address of register array
            plo     r7
            ldi     0                 ; set to zero
            str     r7
+           plo     r9                ; set P=0
+           phi     r9                ; set X=0
 
 
            ldi     0ch               ; clear screen
@@ -1410,6 +1473,9 @@ main:      ldi     23                ; position for prompt
            plo     rf
            sep     scall             ; get input from user
            dw      f_input
+           mov     rf,buffer         ; convert to uppercase
+           sep     scall
+           dw      touc
            ldi     buffer.1          ; point to input buffer
            phi     rf
            ldi     buffer.0
@@ -1453,6 +1519,14 @@ main:      ldi     23                ; position for prompt
            ldn     rf                ; recover input byte
            smi     'G'               ; check for go command
            lbz     go                ; jump if so
+           ldn     rf                ; recover input byte
+           smi     'E'               ; check for exit command
+           lbz     exit              ; jump if so
+#ifdef ANYROM
+           ldn     rf                ; recover input byte
+           smi     'A'               ; check for assember command
+           lbz     asm               ; jump if so
+#endif
 
            ldi     multi.0           ; address of multi-execute flag
            plo     r7                ; put into data pointer
@@ -1519,6 +1593,31 @@ go:        ldi     multi.0           ; need multi-execution flag
            inc     r7                ; point to low byte
            str     r7
            lbr     cycle             ; now start cycling
+
+; ************************
+; ***** Exit command *****
+; ************************
+exit:      ldi     0ch               ; clear screen
+           sep     scall
+           dw      f_type
+#ifdef ANYROM
+           lbr     08003h            ; Pico ROM warm start
+#else
+#ifdef ELFOS
+           lbr     o_wrmboot         ; return to Elf/OS
+#else
+           mov     r0,0f900h         ; pointer to minimon
+           sep     r0                ; exit
+#endif
+#endif
+
+#ifdef ANYROM
+; ***********************
+; ***** Asm command *****
+; ***********************
+asm:       mov     r0,edtasm+3
+           sep     r0
+#endif
 
 ; ******************************************
 ; ***** Move memory RF->RD, RC.0 count *****
@@ -2226,6 +2325,31 @@ trapsub4:  ldi     ntraps.0          ; point to number of traps
            str     r7                ; and put it back
            lbr     showtp            ; show remaining traps
 
+; **********************************************************
+; ***** Convert string to uppercase, honor quoted text *****
+; **********************************************************
+touc:      ldn     rf                  ; check for quote
+           smi     027h
+           lbz     touc_qt             ; jump if quote
+           ldn     rf                  ; get byte from string
+           lbz     touc_dn             ; jump if done
+           smi     'a'                 ; check if below lc
+           lbnf    touc_nxt            ; jump if so
+           smi     27                  ; check upper rage
+           lbdf    touc_nxt            ; jump if above lc
+           ldn     rf                  ; otherwise convert character to lc
+           smi     32
+           str     rf
+touc_nxt:  inc     rf                  ; point to next character
+           lbr     touc                ; loop to check rest of string
+touc_dn:   sep     sret                ; return to caller
+touc_qt:   inc     rf                  ; move past quote
+touc_qlp:  lda     rf                  ; get next character
+           lbz     touc_dn             ; exit if terminator found
+           smi     027h                ; check for quote charater
+           lbz     touc                ; back to main loop if quote
+           lbr     touc_qlp            ; otherwise keep looking
+
 inst:      dw      doidl             ; 00 - IDL
            dw      doldn             ; 01 - LDN R1
            dw      doldn             ; 02 - LDN R2
@@ -2483,7 +2607,18 @@ inst:      dw      doidl             ; 00 - IDL
            dw      doshl             ; FE - SHL
            dw      dosmi             ; FF - SMI
 prompt:    db      27,'[JV02>',0
+
+#ifdef ELFOS
+           org     7f00h
+#else
+#ifdef STGROM
+;[RLA] The Visual/02 data segment is always just below the monitor's data page.
+           org     RAMPAGE-0100h
+#else
            org     7e00h
+#endif
+#endif
+
 r0:        equ     $
 r1:        equ     r0+2
 r2:        equ     r1+2

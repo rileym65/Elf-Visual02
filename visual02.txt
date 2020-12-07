@@ -27,5 +27,7 @@ T+nn            - Set trap for instruction nn
 T-nn            - Remove trap for instruction nn
 TC              - Clear all traps
 <enter>         - Step 1 instruction
-n<enter>        - Execute n instructions
 G               - Go until next breakpoint or trap
+E               - Exit
+A               - Switch to EDTASM (Pico/Elf only)
+
