@@ -12,6 +12,9 @@ picoelf: $(PROJECT).asm bios.inc
 stg: $(PROJECT).asm bios.inc
 	rcasm -l -v -x -d1802 -DSTGROM $(PROJECT) 2>&1 | tee $(PROJECT).lst
 
+mchip: $(PROJECT).asm bios.inc
+	rcasm -l -v -x -d1802 -DMCHIP $(PROJECT) 2>&1 | tee $(PROJECT).lst
+
 clean:
 	-rm $(PROJECT).prg
 

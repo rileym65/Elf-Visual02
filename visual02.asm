@@ -15,22 +15,45 @@
 ;[RLA] options, so define a master "ANYROM" option that's true for
 ;[RLA] any of the ROM conditions...
 
+#ifdef MCHIP
+#define ANYROM
+#define CODE 06000h
+#define DATA 0fe00h
+edtasm:    equ     03000h
+exitaddr:  equ     07003h
+#endif
+
 #ifdef PICOROM
 #define ANYROM
+#define CODE 0e000h
+#define DATA 07e00h
+edtasm:    equ     0b000h
+exitaddr:  equ     08003h
 #endif
 
 #ifdef STGROM
-#define ANYROM
-#endif
-
-#ifdef STGROM
-;[RLA] STG ROM addresses and options
 include config.inc
+#define ANYROM
+#define CODE VISUAL
+#define DATA RAMPAGE-0100h
+exitaddr:  equ     08003h
 #endif
 
 include    bios.inc
+
 #ifdef ELFOS
 include    kernel.inc
+#define CODE 0e000h
+#define DATA 07f00h
+exitaddr:  equ     o_wrmboot
+#endif
+
+#ifndef CODE
+#define ANYROM
+#define CODE 0e000h
+#define DATA 07e00h
+edtasm:    equ     03000h
+exitaddr:  equ     0f900h
 #endif
 
 ; R7 - pointer to R[]
@@ -44,7 +67,6 @@ include    kernel.inc
 
 #ifdef PICOROM
            org     0e000h
-edtasm:    equ     0b000h
 #else
 #ifdef STGROM
            org     VISUAL
@@ -64,8 +86,9 @@ edtasm:    equ     0b000h
 #endif
 #endif
 
+           org     CODE
 
-start:     lbr     start2            ; jump past warm start
+start:     br      start2            ; jump past warm start
            lbr     begin             ; do not need initcall
 start2:    ldi     r0.1              ; get data segment
            phi     r2                ; set into stack register
@@ -90,6 +113,10 @@ incr2:     sep     rb                ; retrieve R register value into rf
            str     r7
            sep     sret
 
+; *********************************************************************
+; **** Note that this next line needs to be at E020 for the Elf/OS ****
+; **** visual02 stub program to identify that Visual/02 is present ****
+; *********************************************************************
            db      0,'ADC ',0
 doadc:     ghi     r9                ; get X
            sep     ra                ; set R7 to correct R register
@@ -1600,15 +1627,8 @@ go:        ldi     multi.0           ; need multi-execution flag
 exit:      ldi     0ch               ; clear screen
            sep     scall
            dw      f_type
-#ifdef ANYROM
-           lbr     08003h            ; Pico ROM warm start
-#else
-#ifdef ELFOS
-           lbr     o_wrmboot         ; return to Elf/OS
-#else
-           mov     r0,0f900h         ; pointer to minimon
+           lbr     exitaddr
            sep     r0                ; exit
-#endif
 #endif
 
 #ifdef ANYROM
@@ -2222,10 +2242,10 @@ showtp:    ldi     ntraps.0          ; get number of traps
            ldi     3
            plo     rd
            glo     rc                ; Are there any traps
-           lbnz    showtplp1         ; jump if so
+           bnz     showtplp1         ; jump if so
            ghi     rc                ; move blank count
            plo     rc                ; to rc
-           lbr     showtplp2         ; now show blank lines
+           br      showtplp2         ; now show blank lines
 showtplp1: sep     scall             ; set cursor position
            dw      gotoxy
            lda     r7                ; get trap byte
@@ -2234,7 +2254,7 @@ showtplp1: sep     scall             ; set cursor position
            inc     rd                ; next row
            dec     rc                ; decrement count
            glo     rc                ; get it
-           lbnz    showtplp1         ; loop until all shown
+           bnz     showtplp1         ; loop until all shown
            ghi     rc                ; get empty count
            plo     rc                ; place in counter
            lbz     main              ; jump if no blank lines needed
@@ -2246,7 +2266,7 @@ showtplp2: sep     scall             ; set cursor position
            inc     rd                ; increment row
            dec     rc                ; decrement count
            glo     rc                ; get count
-           lbnz    showtplp2         ; jump if not done
+           bnz     showtplp2         ; jump if not done
            lbr     main              ; then return to main
 
 ; ***************************
@@ -2256,7 +2276,7 @@ trapc:     ldi     ntraps.0          ; need address of trap count
            plo     r7                ; put into data pointer
            ldi     0                 ; need to clear
            str     r7                ; write to trap count
-           lbr     showtp            ; show trap list
+           br      showtp            ; show trap list
 
 ; ********************
 ; ***** Add trap *****
@@ -2279,7 +2299,7 @@ trapadd:   ldi     ntraps.0          ; point to number of traps
            dw      tohex
            glo     rc                ; get value
            str     r7                ; and store it
-           lbr     showtp            ; show traps
+           br      showtp            ; show traps
 
 ; ***********************
 ; ***** Remove trap *****
@@ -2297,11 +2317,11 @@ trapsub:   inc     rf                ; move past -
            sex     r7                ; need to use for comparisons
 trapsub1:  glo     rc                ; get value
            sm                        ; see if matches
-           lbz     trapsub3          ; jump if address found
+           bz      trapsub3          ; jump if address found
 trapsub2:  inc     r7                ; point to next entry
            dec     re                ; decrement count
            glo     re                ; see if done
-           lbnz    trapsub1          ; loop if more to check
+           bnz     trapsub1          ; loop if more to check
            sex     r2                ; point x back to R[2]
            lbz     main              ; otherwise return to caller
 trapsub3:  sex     r2                ; point x back to R[2]
@@ -2313,7 +2333,7 @@ trapsub3:  sex     r2                ; point x back to R[2]
            plo     rf
            inc     rf                ; rf needs to be 1 entry up
            glo     re                ; get count remaining
-           lbz     trapsub4          ; jump if it was last entry, nothing to move
+           bz      trapsub4          ; jump if it was last entry, nothing to move
            smi     1                 ; 1 entry less
            plo     rc                ; rc now has count
            sep     scall             ; call move memory routine
@@ -2323,32 +2343,32 @@ trapsub4:  ldi     ntraps.0          ; point to number of traps
            ldn     r7                ; get count
            smi     1                 ; decrement
            str     r7                ; and put it back
-           lbr     showtp            ; show remaining traps
+           br      showtp            ; show remaining traps
 
 ; **********************************************************
 ; ***** Convert string to uppercase, honor quoted text *****
 ; **********************************************************
 touc:      ldn     rf                  ; check for quote
            smi     027h
-           lbz     touc_qt             ; jump if quote
+           bz      touc_qt             ; jump if quote
            ldn     rf                  ; get byte from string
-           lbz     touc_dn             ; jump if done
+           bz      touc_dn             ; jump if done
            smi     'a'                 ; check if below lc
-           lbnf    touc_nxt            ; jump if so
+           bnf     touc_nxt            ; jump if so
            smi     27                  ; check upper rage
-           lbdf    touc_nxt            ; jump if above lc
+           bdf     touc_nxt            ; jump if above lc
            ldn     rf                  ; otherwise convert character to lc
            smi     32
            str     rf
 touc_nxt:  inc     rf                  ; point to next character
-           lbr     touc                ; loop to check rest of string
+           br      touc                ; loop to check rest of string
 touc_dn:   sep     sret                ; return to caller
 touc_qt:   inc     rf                  ; move past quote
 touc_qlp:  lda     rf                  ; get next character
-           lbz     touc_dn             ; exit if terminator found
+           bz      touc_dn             ; exit if terminator found
            smi     027h                ; check for quote charater
-           lbz     touc                ; back to main loop if quote
-           lbr     touc_qlp            ; otherwise keep looking
+           bz      touc                ; back to main loop if quote
+           br      touc_qlp            ; otherwise keep looking
 
 inst:      dw      doidl             ; 00 - IDL
            dw      doldn             ; 01 - LDN R1
@@ -2608,17 +2628,7 @@ inst:      dw      doidl             ; 00 - IDL
            dw      dosmi             ; FF - SMI
 prompt:    db      27,'[JV02>',0
 
-#ifdef ELFOS
-           org     7f00h
-#else
-#ifdef STGROM
-;[RLA] The Visual/02 data segment is always just below the monitor's data page.
-           org     RAMPAGE-0100h
-#else
-           org     7e00h
-#endif
-#endif
-
+           org     DATA
 r0:        equ     $
 r1:        equ     r0+2
 r2:        equ     r1+2
