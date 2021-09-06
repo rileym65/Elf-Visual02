@@ -42,10 +42,14 @@ exitaddr:  equ     08003h
 include    bios.inc
 
 #ifdef ELFOS
-include    kernel.inc
+include    ../Elfos/kernel.inc
 #define CODE 0e000h
 #define DATA 07f00h
 exitaddr:  equ     o_wrmboot
+#define    FTYPE   o_type
+#define    FINMSG  o_inmsg
+#define    FMSG    o_msg
+#define    FINPUT  o_input
 #endif
 
 #ifndef CODE
@@ -54,6 +58,10 @@ exitaddr:  equ     o_wrmboot
 #define DATA 07e00h
 edtasm:    equ     03000h
 exitaddr:  equ     0f900h
+#define    FTYPE   f_type
+#define    FINMSG  f_inmsg
+#define    FMSG    f_msg
+#define    FINPUT  f_input
 #endif
 
 ; R7 - pointer to R[]
@@ -88,7 +96,7 @@ exitaddr:  equ     0f900h
 
            org     CODE
 
-start:     br      start2            ; jump past warm start
+start:     lbr      start2           ; jump past warm start
            lbr     begin             ; do not need initcall
 start2:    ldi     r0.1              ; get data segment
            phi     r2                ; set into stack register
@@ -979,43 +987,43 @@ itoadn:    glo     rf                ; get low character
 ; *********************************************
 gotoxy:    ldi     27                ; escape character
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            ldi     '['               ; square bracket
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            glo     rd                ; get x
            sep     scall             ; convert to ascii
            dw      itoa
            ghi     rf                ; high character
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            glo     rf                ; low character
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            ldi     ';'               ; need separator
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            ghi     rd                ; get y
            sep     scall             ; convert to ascii
            dw      itoa
            ghi     rf                ; high character
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            glo     rf                ; low character
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            ldi     'H'               ; need terminator for position
            sep     scall             ; write it
-           dw      f_type
+           dw      FTYPE
            sep     sret              ; return to caller
 
 invert:    sep     scall             ; send sequence
-           dw      f_inmsg
+           dw      FINMSG
            db      27,'7m',0
            sep     sret              ; return to caller
 
 normal:    sep     scall             ; send sequence
-           dw      f_inmsg
+           dw      FINMSG
            db      27,'27m',0
            sep     sret              ; return to caller
 
@@ -1027,11 +1035,11 @@ disp4:     ani     0fh               ; strip high nybble
            lbdf    disp42            ; jump if so
            adi     03ah              ; add 10 back and convert to ascii
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            sep     sret              ; and return
 disp42:    adi     'A'               ; convert to ascii letter
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            sep     sret              ; and return
 
 ; ************************************
@@ -1161,28 +1169,28 @@ regslp:    sep     scall             ; position cursor
 drawbox:   sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; display message
-           dw      f_inmsg
+           dw      FINMSG
            db      '+-------+',0
            inc     rd                ; next row
            sep     scall             ; set position
            dw      gotoxy
            sep     scall             ; display message
-           dw      f_inmsg
+           dw      FINMSG
            db      '| ',0
            ghi     rc                ; get first passed character
            sep     scall             ; and display it
-           dw      f_type
+           dw      FTYPE
            glo     rc                ; get second passed character
            sep     scall
-           dw      f_type
+           dw      FTYPE
            sep     scall             ; now finish line
-           dw      f_inmsg
+           dw      FINMSG
            db      '    |',0
            inc     rd
            sep     scall             ; set position
            dw      gotoxy
            sep     scall             ; display message
-           dw      f_inmsg
+           dw      FINMSG
            db      '+-------+',0
            inc     rd                ; increment row
            sep     sret              ; return to caller
@@ -1193,7 +1201,7 @@ drawbox:   sep     scall             ; set cursor position
 drawbig:   sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; draw top line
-           dw      f_inmsg
+           dw      FINMSG
            db      '+------------------------------+',0
            inc     rd                ; point to next line
            ldi     7                 ; need 7 lines
@@ -1202,7 +1210,7 @@ biglp:     sep     scall             ; position cursor
            dw      gotoxy
            ldi     '|'               ; frame character
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            ghi     rd                ; get x coordinate
            adi     31                ; point to right side
            phi     rd                ; put back into coordinates
@@ -1210,7 +1218,7 @@ biglp:     sep     scall             ; position cursor
            dw      gotoxy
            ldi     '|'               ; border character
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            ghi     rd                ; get x coordinate
            smi     31                ; move it back
            phi     rd
@@ -1221,7 +1229,7 @@ biglp:     sep     scall             ; position cursor
            sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; draw bottom line
-           dw      f_inmsg
+           dw      FINMSG
            db      '+------------------------------+',0
            sep     sret              ; return to caller
 
@@ -1236,13 +1244,13 @@ drawscn:   ldi     1                 ; start at first row
            sep     scall             ; position cursor
            dw      gotoxy
            sep     scall             ; draw first part
-           dw      f_inmsg
+           dw      FINMSG
            db      '+----------+',0
            inc     rd                ; point to 2nd row
 drawlp1:   sep     scall
            dw      gotoxy
            sep     scall             ; draw row
-           dw      f_inmsg
+           dw      FINMSG
            db      '|          |',0
            inc     rd                ; next row
            dec     rc                ; decrement row count
@@ -1251,7 +1259,7 @@ drawlp1:   sep     scall
            sep     scall             ; position cursor for last row
            dw      gotoxy
            sep     scall             ; draw last row
-           dw      f_inmsg
+           dw      FINMSG
            db      '+----------+',0
            ldi     2                 ; start at first row
            plo     rd                ; put into position
@@ -1263,7 +1271,7 @@ drawlp:    sep     scall             ; set cursor position
            dw      gotoxy
            ldi     'R'               ; need R
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            glo     rc                ; get current count
            sep     scall             ; and display it
            dw      disp4
@@ -1327,7 +1335,7 @@ drawlp:    sep     scall             ; set cursor position
            sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; display breakpoint label
-           dw      f_inmsg
+           dw      FINMSG
            db      '   BRK:',0
            ldi     67                ; position for traps label
            phi     rd
@@ -1336,7 +1344,7 @@ drawlp:    sep     scall             ; set cursor position
            sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; now draw label
-           dw      f_inmsg
+           dw      FINMSG
            db      'TRAPS',0
            ldi     34                ; X address of disassembly box
            phi     rd
@@ -1349,14 +1357,23 @@ drawlp:    sep     scall             ; set cursor position
            dw      drawbig
            sep     sret              ; otherwise return to caller
 
+#ifdef ELFOS
+begin:     mov     rc,255            ; allocate memory on heap
+           mov     r7,0ff00h
+           sep     scall
+           dw      o_alloc
+           ghi     rf
+           phi     r7
+#else
 begin:     ldi     r0.1              ; Get address of register array
            phi     r7                ; and set R7
-           mov     ra,setr7          ; set RA to set r7 routine
-           mov     rb,retrr7         ; get RB to R[r7]->rf
            ldi     r0.1              ; get data segment
            phi     r2                ; set into stack register
            ldi     0ffh              ; stack will be at end of segment
            plo     r2
+#endif
+           mov     ra,setr7          ; set RA to set r7 routine
+           mov     rb,retrr7         ; get RB to R[r7]->rf
            ldi     nbp.0             ; number of breakpoints
            plo     r7
            ldi     0                 ; set to zero
@@ -1372,10 +1389,9 @@ begin:     ldi     r0.1              ; Get address of register array
            plo     r9                ; set P=0
            phi     r9                ; set X=0
 
-
-           ldi     0ch               ; clear screen
-           sep     scall
-           dw      f_type
+           sep     scall             ; clear screen
+           dw      FINMSG
+           db      27,'[2J',0
 
            sep     scall             ; draw screen
            dw      drawscn
@@ -1466,7 +1482,7 @@ instdn1:   ldi     21                ; set position for next inst disassembly
            dw      gotoxy
            ldi     '>'               ; marker for next instruction
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            glo     r9                ; get P
            sep     ra                ; set into r7
            sep     rb                ; retrieve value into rf
@@ -1477,7 +1493,7 @@ instdn1:   ldi     21                ; set position for next inst disassembly
            dw      gotoxy
            ldi     ' '               ; move over 1 space
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            ldi     last.0            ; address of last instruction
            plo     r7                ; set into register pointer
            sep     rb                ; retrieve address
@@ -1493,13 +1509,13 @@ main:      ldi     23                ; position for prompt
 
            mov     rf,prompt
            sep     scall             ; display prompt
-           dw      f_msg
+           dw      FMSG
            ldi     buffer.1          ; point to input buffer
            phi     rf
            ldi     buffer.0
            plo     rf
            sep     scall             ; get input from user
-           dw      f_input
+           dw      FINPUT
            mov     rf,buffer         ; convert to uppercase
            sep     scall
            dw      touc
@@ -1626,7 +1642,7 @@ go:        ldi     multi.0           ; need multi-execution flag
 ; ************************
 exit:      ldi     0ch               ; clear screen
            sep     scall
-           dw      f_type
+           dw      FTYPE
            lbr     exitaddr
            sep     r0                ; exit
 #endif
@@ -1706,7 +1722,7 @@ disassem:  push    rf                ; save address
            dw      disp16
            ldi     ' '               ; display a space
            sep     scall
-           dw      f_type
+           dw      FTYPE
            ldn     rf                ; get instruction byte
            shl                       ; multiply by 2
            plo     rc                ; put into rc
@@ -1732,10 +1748,10 @@ disassem:  push    rf                ; save address
            lda     rf                ; get instruction type
            plo     rc                ; save it
            sep     scall             ; display instruction name
-           dw      f_msg
+           dw      FMSG
            ldi     ' '               ; following space
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            pop     rf                ; recover address
            glo     rc                ; get argument type
            lbz     dadone            ; jump if no argument
@@ -1766,7 +1782,7 @@ da2:       inc     rf                ; move past instruction byte
            sep     scall             ; display it
            dw      disp8
 dadone:    sep     scall             ; clear any trailing bytes
-           dw      f_inmsg
+           dw      FINMSG
            db      '        ',0
            inc     rf                ; move rf past instruction
            sep     sret              ; return to caller
@@ -1855,7 +1871,7 @@ dumplpy:   push    rf                ; save address
            plo     rc
 dumplpx:   ldi     ' '               ; need a space
            sep     scall             ; display it
-           dw      f_type
+           dw      FTYPE
            lda     rf                ; get next byte
            sep     scall             ; display it
            dw      disp8
@@ -2128,7 +2144,7 @@ showbplp1: sep     scall             ; set cursor position
 showbplp2: sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; draw 4 spaces
-           dw      f_inmsg
+           dw      FINMSG
            db      '    ',0
            inc     rd                ; increment row
            dec     rc                ; decrement count
@@ -2261,7 +2277,7 @@ showtplp1: sep     scall             ; set cursor position
 showtplp2: sep     scall             ; set cursor position
            dw      gotoxy
            sep     scall             ; draw 2 spaces
-           dw      f_inmsg
+           dw      FINMSG
            db      '  ',0
            inc     rd                ; increment row
            dec     rc                ; decrement count
