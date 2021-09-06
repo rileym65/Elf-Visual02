@@ -1,3 +1,7 @@
+.list
+
+#include ../ops.inc
+
 ; *******************************************************************
 ; *** This software is copyright 2020 by Michael H Riley          ***
 ; *** You have permission to use, modify, copy, and distribute    ***
@@ -21,6 +25,10 @@
 #define DATA 0fe00h
 edtasm:    equ     03000h
 exitaddr:  equ     07003h
+#define    FTYPE   f_type
+#define    FINMSG  f_inmsg
+#define    FMSG    f_msg
+#define    FINPUT  f_input
 #endif
 
 #ifdef PICOROM
@@ -29,6 +37,10 @@ exitaddr:  equ     07003h
 #define DATA 07e00h
 edtasm:    equ     0b000h
 exitaddr:  equ     08003h
+#define    FTYPE   f_type
+#define    FINMSG  f_inmsg
+#define    FMSG    f_msg
+#define    FINPUT  f_input
 #endif
 
 #ifdef STGROM
@@ -39,7 +51,7 @@ include config.inc
 exitaddr:  equ     08003h
 #endif
 
-include    bios.inc
+include    ../bios.inc
 
 #ifdef ELFOS
 include    ../Elfos/kernel.inc
@@ -98,7 +110,7 @@ exitaddr:  equ     0f900h
 
 start:     lbr      start2           ; jump past warm start
            lbr     begin             ; do not need initcall
-start2:    ldi     r0.1              ; get data segment
+start2:    ldi     v_r0.1            ; get data segment
            phi     r2                ; set into stack register
            ldi     0ffh              ; stack will be at end of segment
            plo     r2
@@ -204,7 +216,7 @@ doani:     glo     r9                ; get P
            lbr     incp
 
            db      2,'B1  ',0
-dob1:      b1      dob1_yes.0
+dob1:      b1      dob1_yes
            lbr     incp              ; otherwise increment R[P]
 dob1_yes:  lbr     dobr              ; branch
 
@@ -1076,7 +1088,7 @@ drawregs:  ldi     2                 ; start at first row
            plo     rd                ; put into position
            ldi     7                 ; column
            phi     rd                ; put into position
-           ldi     r0.0              ; point to R[0]
+           ldi     v_r0.0            ; point to R[0]
            plo     r7                ; put into register pointer
            ldi     0                 ; set count to 0
            plo     rc                ; in rc
@@ -1365,9 +1377,9 @@ begin:     mov     rc,255            ; allocate memory on heap
            ghi     rf
            phi     r7
 #else
-begin:     ldi     r0.1              ; Get address of register array
+begin:     ldi     v_r0.1            ; Get address of register array
            phi     r7                ; and set R7
-           ldi     r0.1              ; get data segment
+           ldi     v_r0.1            ; get data segment
            phi     r2                ; set into stack register
            ldi     0ffh              ; stack will be at end of segment
            plo     r2
@@ -1922,7 +1934,7 @@ store2:    sep     scall             ; retrieve next value
 run:       inc     rf                ; move to address
            sep     scall             ; get address
            dw      getaddr
-           ldi     r0.0              ; need to set into R[0]
+           ldi     v_r0.0            ; need to set into R[0]
            plo     r7                ; set register pointer
            ghi     rf                ; get high byte of address
            str     r7                ; and store it
@@ -2645,22 +2657,22 @@ inst:      dw      doidl             ; 00 - IDL
 prompt:    db      27,'[JV02>',0
 
            org     DATA
-r0:        equ     $
-r1:        equ     r0+2
-r2:        equ     r1+2
-r3:        equ     r2+2
-r4:        equ     r3+2
-r5:        equ     r4+2
-r6:        equ     r5+2
-r7:        equ     r6+2
-r8:        equ     r7+2
-r9:        equ     r8+2
-ra:        equ     r9+2
-rb:        equ     ra+2
-rc:        equ     rb+2
-rd:        equ     rc+2
-re:        equ     rd+2
-rf:        equ     re+2
+v_r0:      equ     $
+v_r1:      equ     r0+2
+v_r2:      equ     r1+2
+v_r3:      equ     r2+2
+v_r4:      equ     r3+2
+v_r5:      equ     r4+2
+v_r6:      equ     r5+2
+v_r7:      equ     r6+2
+v_r8:      equ     r7+2
+v_r9:      equ     r8+2
+v_ra:      equ     r9+2
+v_rb:      equ     ra+2
+v_rc:      equ     rb+2
+v_rd:      equ     rc+2
+v_re:      equ     rd+2
+v_rf:      equ     re+2
 q:         equ     rf+2
 t:         equ     q+1
 ie:        equ     t+1
