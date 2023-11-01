@@ -1,6 +1,4 @@
-.list
-
-#include ../ops.inc
+#include    ../include/ops.inc
 
 ; *******************************************************************
 ; *** This software is copyright 2020 by Michael H Riley          ***
@@ -44,17 +42,17 @@ exitaddr:  equ     08003h
 #endif
 
 #ifdef STGROM
-include config.inc
+#include config.inc
 #define ANYROM
 #define CODE VISUAL
 #define DATA RAMPAGE-0100h
 exitaddr:  equ     08003h
 #endif
 
-include    ../bios.inc
+#include    ../include/bios.inc
 
 #ifdef ELFOS
-include    ../Elfos/kernel.inc
+#include    ../Elfos/kernel.inc
 #define CODE 0e000h
 #define DATA 07f00h
 exitaddr:  equ     o_wrmboot
@@ -1577,6 +1575,7 @@ main:      ldi     23                ; position for prompt
            ldn     rf                ; recover input byte
            smi     'E'               ; check for exit command
            lbz     exit              ; jump if so
+
 #ifdef ANYROM
            ldn     rf                ; recover input byte
            smi     'A'               ; check for assember command
@@ -1649,14 +1648,14 @@ go:        ldi     multi.0           ; need multi-execution flag
            str     r7
            lbr     cycle             ; now start cycling
 
+#ifdef ANYROM
 ; ************************
 ; ***** Exit command *****
 ; ************************
-exit:      ldi     0ch               ; clear screen
-           sep     scall
-           dw      FTYPE
-           lbr     exitaddr
-           sep     r0                ; exit
+exit:      sep     scall             ; clear screen
+           dw      FINMSG
+           db      27,'[2J',0
+           lbr     exitaddr          ; exit
 #endif
 
 #ifdef ANYROM
@@ -1715,7 +1714,12 @@ tohexd:    lda     rf                ; recover character
 tohexad:   str     r2                ; store value to add
            ldi     4                 ; need to shift 4 times
            plo     re
-tohexal:   shl     rc
+tohexal:   glo     rc                ; shift rc left
+           shl                       ; shift lower byte 
+           plo     rc
+           ghi     rc                ; shift carry into upper byte
+           shlc    
+           phi     rc
            dec     re                ; decrement count
            glo     re                ; get count
            lbnz    tohexal           ; loop until done
@@ -2658,22 +2662,22 @@ prompt:    db      27,'[JV02>',0
 
            org     DATA
 v_r0:      equ     $
-v_r1:      equ     r0+2
-v_r2:      equ     r1+2
-v_r3:      equ     r2+2
-v_r4:      equ     r3+2
-v_r5:      equ     r4+2
-v_r6:      equ     r5+2
-v_r7:      equ     r6+2
-v_r8:      equ     r7+2
-v_r9:      equ     r8+2
-v_ra:      equ     r9+2
-v_rb:      equ     ra+2
-v_rc:      equ     rb+2
-v_rd:      equ     rc+2
-v_re:      equ     rd+2
-v_rf:      equ     re+2
-q:         equ     rf+2
+v_r1:      equ     v_r0+2
+v_r2:      equ     v_r1+2
+v_r3:      equ     v_r2+2
+v_r4:      equ     v_r3+2
+v_r5:      equ     v_r4+2
+v_r6:      equ     v_r5+2
+v_r7:      equ     v_r6+2
+v_r8:      equ     v_r7+2
+v_r9:      equ     v_r8+2
+v_ra:      equ     v_r9+2
+v_rb:      equ     v_ra+2
+v_rc:      equ     v_rb+2
+v_rd:      equ     v_rc+2
+v_re:      equ     v_rd+2
+v_rf:      equ     v_re+2
+q:         equ     v_rf+2
 t:         equ     q+1
 ie:        equ     t+1
 last:      equ     ie+1
@@ -2684,4 +2688,3 @@ bp:        equ     nbp+1
 ntraps:    equ     bp+16
 traps:     equ     ntraps+1
 buffer:    equ     traps+16
-
