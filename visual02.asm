@@ -1391,7 +1391,7 @@ begin:     ldi     v_r0.1            ; Get address of register array
            ldi     ntraps.0          ; number of traps
            plo     r7
            ldi     0                 ; set to zero
-           plo     r7
+           str     r7
            ldi     multi.0           ; point to multi execution flag
            plo     r7
            ldi     0                 ; set to zero
