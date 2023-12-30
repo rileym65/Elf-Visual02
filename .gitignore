@@ -1,6 +1,3 @@
-bios.inc
-config.inc
-kernel.inc
 *.lst
 *.prg
 x.x
